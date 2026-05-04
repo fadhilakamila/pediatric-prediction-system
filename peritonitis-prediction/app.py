@@ -12,14 +12,12 @@ from streamlit_option_menu import option_menu
 
 # === CACHE (data loading) ===
 @st.cache_data
-def load_data(modul):
-    file_path_peritonitis = 'PeritonitisPrediction_Database.xlsx' 
-    file_path_crrt = 'PredictCRRTforKids_Database.xlsx'
-    
-    target_file = file_path_peritonitis if modul == "Peritonitis Prediction" else file_path_crrt
-    
+def load_data(module):
+
+    file_path = 'PeritonitisPrediction_Database.xlsx' if module == "Peritonitis" else 'PredictCRRTforKids_Database.xlsx'
+
     try:
-        df = pd.read_excel(target_file)
+        df = pd.read_excel(file_path)
         return df
     except FileNotFoundError:
         return pd.DataFrame()
@@ -27,36 +25,36 @@ def load_data(modul):
         st.error(f"Terjadi kesalahan saat membaca data: {e}")
         return pd.DataFrame()
 
-def save_prediction(user_inputs, prediction_score, outcome, module_name):
+# === simpan ke excel (database lokal) ===
+def save_prediction(user_selections, survival_rate, outcome, module_name, supporting_factors=None, risk_factors=None, mrf_list=None, mrf_dict=None):
     
-    file_path = 'PeritonitisPrediction_Database.xlsx'
+    file_path = 'PeritonitisPrediction_Database.xlsx' if module_name == "Peritonitis" else 'PredictCRRTforKids_Database.xlsx'
     
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # ANONIMISASI Nama Pasien
-    raw_name = user_inputs.get("Nama Pasien", "Unknown")
-    # ID unik = hash nama + waktu
-    patient_id = hashlib.sha256(raw_name.encode()).hexdigest()[:8].upper()
+    raw_name = user_selections.get("Nama Pasien", "Unknown")
+    patient_id = hashlib.sha256(raw_name.encode()).hexdigest()[:8].upper() # ID unik = hash nama + waktu
+    mrf_full_text = ""
+    if mrf_list and mrf_dict:
+        mrf_full_text = " | ".join([f"{mrf}: {mrf_dict.get(mrf, '')}" for mrf in mrf_list])
     
-    # 3. MENYIAPKAN DATA BARU
-    # Mulai dengan kolom dasar
     new_data = {
         "Timestamp": timestamp,
         "Patient_ID": patient_id,
-        "Module": module_name
+        "Module": module_name,
+        "Supporting_Factors": ", ".join(supporting_factors) if supporting_factors else "",
+        "Risk_Factors": ", ".join(risk_factors) if risk_factors else "",
+        "Modifiable_Risk_Factors_Advice": mrf_full_text
     }
     
-    # Otomatis mengisi kolom berdasarkan dictionary variables_data
-    # user_inputs adalah dictionary yang berisi { "label": "pilihan_user" }
-    for label, value in user_inputs.items():
-        if label != "Nama Pasien": # nama asli tidak disimpan ke excel
+    for label, value in user_selections.items():
+        if label != "Nama Pasien":
             new_data[label] = value
             
-    # Tambahkan hasil prediksi
-    new_data["Prediction_Score"] = f"{prediction_score:.2f}%"
+    score_column = "Survival Rate" if module_name == "Peritonitis" else "survival probability"
+    new_data[score_column] = f"{survival_rate:.2f}%"
     new_data["Outcome"] = outcome
     
-    # 4. PROSES SIMPAN KE EXCEL (DATABASE LOKAL)
     new_df = pd.DataFrame([new_data])
     
     if os.path.exists(file_path):
@@ -66,7 +64,7 @@ def save_prediction(user_inputs, prediction_score, outcome, module_name):
         updated_df = new_df
         
     updated_df.to_excel(file_path, index=False)
-    return patient_id # Mengembalikan ID untuk ditampilkan ke user
+    return patient_id
 
 # === PASSWORD ===
 def check_password():
@@ -108,7 +106,6 @@ st.set_page_config(
 if not check_password():
     st.stop()
 
-
 # === SIDEBAR NAVIGATION ===
 with st.sidebar:
     st.title("Menu")
@@ -135,12 +132,11 @@ with st.sidebar:
     
     st.space()
 
-    # LOGOUT
+    # === LOGOUT ===
     if st.button("Log out", use_container_width=True, type="secondary"):
-        # Menghapus status login dari session state
         st.session_state["password_correct"] = False
-        # Refresh halaman agar kembali ke form login
         st.rerun()
+        st.success("Anda berhasil logout")
 
 # === PERITONITIS PREDICTION ===
 if selection == "Peritonitis Prediction":
@@ -205,6 +201,7 @@ if selection == "Peritonitis Prediction":
 
             user_selections["Nama Pasien"] = patient_name
 
+            # === PERHITUNGAN WEIGHTED AVERAGE ===
             total_wi_xi = 0
             total_wi = 0
             
@@ -212,7 +209,6 @@ if selection == "Peritonitis Prediction":
             xai_supporting_peritonitis = []
             modifiable_risk_factors = []
 
-            # === PERHITUNGAN WEIGHTED AVERAGE ===
             for var in variables_data:
                 # Bobot (wi)
                 weight = 2 if var['p_val'] < 0.05 else 1
@@ -229,8 +225,7 @@ if selection == "Peritonitis Prediction":
                     xai_supporting_non_peritonitis.append(var['label'])
                 else:
                     xai_supporting_peritonitis.append(var['label'])
-                
-                # Identifikasi MRF
+
                 if var['mrf'] and x_val == 1:
                     modifiable_risk_factors.append(var['label'])
 
@@ -241,7 +236,7 @@ if selection == "Peritonitis Prediction":
             
             st.markdown("---")
 
-            # 1. Hasil Prediksi
+            # === Hasil Prediksi ===
             if survival_rate >= 50:
                 color_code = "#22c55e"
                 status_label = "🟢SURVIVOR"
@@ -252,12 +247,7 @@ if selection == "Peritonitis Prediction":
                 status_label = "🟠NON-SURVIVOR"
                 status_text = "< 50%"
                 outcome = "Non-Survivor"
-
-            id_anonim = save_prediction(user_selections, survival_rate, outcome, "Peritonitis")
             
-            st.success(f"Prediksi Berhasil Disimpan! ID Pasien: {id_anonim}")
-            st.info("Sesuai protokol etik, nama pasien telah di-anonimkan dalam database.")
-
             st.markdown(f"""
                 <div style="line-height: 1.0;">
                     <h3 style="margin-bottom: 4px; padding-bottom: 0px;">Hasil Prediksi <i>{patient_name}</i></h3>
@@ -267,8 +257,7 @@ if selection == "Peritonitis Prediction":
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
-            
-            # 2. XAI dengan Card
+
             expl_col1, expl_col2 = st.columns(2)
 
             with expl_col1:
@@ -293,12 +282,12 @@ if selection == "Peritonitis Prediction":
                     else:
                         ui.element("p", children=["Risiko terpantau rendah."], className="text-sm text-gray-400 m-1", key="none_risk")
 
-            #3. Modifiable Risk Factor (MRF)
             if modifiable_risk_factors:
                 st.markdown("##### Modifiable Risk Factors (MRF)")
-
                 st.write("Berikut adalah rekomendasi intervensi yang dapat diambil untuk meningkatkan peluang survival")
                 
+                mrf_full_text = " | ".join([f"{mrf}: {mrf_explanations.get(mrf, '')}" for mrf in modifiable_risk_factors])
+
                 accordion_data = []
                 for mrf in modifiable_risk_factors:
                     penjelasan = mrf_explanations.get(mrf, "Perlu konsultasi lebih lanjut dengan dokter spesialis.")
@@ -309,14 +298,58 @@ if selection == "Peritonitis Prediction":
                 
                 if accordion_data:
                     ui.accordion(data=accordion_data, key="mrf_accordion")
+            else:
+                mrf_full_text = ""
+
+            # === simpan data ke excel ===
+            id_anonim = save_prediction(
+                user_selections,
+                survival_rate,
+                outcome,
+                "Peritonitis",
+                supporting_factors=xai_supporting_non_peritonitis,
+                risk_factors=xai_supporting_peritonitis,
+                mrf_list=modifiable_risk_factors,
+                mrf_dict=mrf_explanations
+            )
+            
+            st.cache_data.clear()
+
+            # === Download Data ===
+            data_single_patient = {
+                "Module": "Peritonitis",
+                "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "Patient_ID": id_anonim,
+                **{k: v for k, v in user_selections.items() if k != "Nama Pasien"},
+                "Survival_Rate": f"{survival_rate:.2f}%",
+                "Outcome": outcome,
+                "Supporting_Factors": ", ".join(xai_supporting_non_peritonitis) if xai_supporting_non_peritonitis else "",
+                "Risk_Factors": ", ".join(xai_supporting_peritonitis) if xai_supporting_peritonitis else "",
+                "Modifiable_Risk_Factors_Advice": mrf_full_text
+            }
+            
+            if "Nama Pasien" in data_single_patient:
+                del data_single_patient["Nama Pasien"]
+            
+            df_single_patient = pd.DataFrame([data_single_patient])
+                
+            st.download_button(
+                label=f"**Download Hasil Prediksi** (ID Pasien: **{id_anonim}**)",
+                data=df_single_patient.to_csv(index=False).encode('utf-8'),
+                file_name=f"Hasil_Prediksi_Peritonitis_{id_anonim}_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+                use_container_width=True,
+                key="download_button"
+            )
+
+            st.caption("*Sesuai protokol etik, nama pasien telah dianonimkan dalam database.*")
 
     if __name__ == "__main__":
         main()
 
 elif selection == "CRRT Prediction":
+    
     st.title("Survival Prediction Calculator for Pediatric CRRT")
-
-    # df_crrt = load_crrt_database()
 
     patient_name = st.text_input("Patient Name")
     patient_id = st.text_input("Patient ID")
@@ -373,14 +406,14 @@ elif selection == "CRRT Prediction":
     user_data = {}
     with col1:
         for i, (var, props) in enumerate(variables.items()):
-            if i % 2 == 0:  # Variables for column 1
+            if i % 2 == 0: 
                 if var in categorical_options:
                     user_data[var] = st.selectbox(f"{props['label']}", categorical_options[var], index=None)
                 else:
                     user_data[var] = st.number_input(f"{props['label']}",step=0.1, value=None, format="%.2f")
     with col2:
         for i, (var, props) in enumerate(variables.items()):
-            if i % 2 != 0:  # Variables for column 2
+            if i % 2 != 0: 
                 if var in categorical_options:
                     user_data[var] = st.selectbox(f"{props['label']}", categorical_options[var], index=None)
                 else:
@@ -423,13 +456,18 @@ elif selection == "CRRT Prediction":
 
         if total_variables > 0:
             final_score = (within_limit / total_variables) * 100
-            new_row = pd.DataFrame([{"name": patient_name, "id": patient_id, "date": date, **user_data, "survival probability": final_score}])
-            df = pd.concat([df, new_row], axis=0, ignore_index=True)
+            outcome = "Survivor" if final_score >= 50 else "Non-Survivor"
+            
+            user_data["Nama Pasien"] = patient_name 
+            
+            id_anonim = save_prediction(user_data, final_score, outcome, "CRRT")
 
             if final_score >= 50:
                 st.success(f"The survival probability score is: {final_score:.2f}%")
             else:
                 st.error(f"The survival probability score is: {final_score:.2f}%")
+            
+            st.info(f"Anonymized Patient ID: {id_anonim}") 
             st.info(f"Variables within the survivor criteria: ({', '.join(within_limit_vars)})")
             st.cache_data.clear()
         else:
