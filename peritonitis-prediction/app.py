@@ -25,7 +25,7 @@ def load_data(module):
         st.error(f"Terjadi kesalahan saat membaca data: {e}")
         return pd.DataFrame()
 
-# === simpan ke excel (database lokal) ===
+# === simpan log ke excel (database lokal) ===
 def save_prediction(user_selections, survival_rate, outcome, module_name, supporting_factors=None, risk_factors=None, mrf_list=None, mrf_dict=None):
     
     file_path = 'PeritonitisPrediction_Database.xlsx' if module_name == "Peritonitis" else 'PredictCRRTforKids_Database.xlsx'
@@ -34,18 +34,21 @@ def save_prediction(user_selections, survival_rate, outcome, module_name, suppor
     
     raw_name = user_selections.get("Nama Pasien", "Unknown")
     patient_id = hashlib.sha256(raw_name.encode()).hexdigest()[:8].upper() # ID unik = hash nama + waktu
-    mrf_full_text = ""
-    if mrf_list and mrf_dict:
-        mrf_full_text = " | ".join([f"{mrf}: {mrf_dict.get(mrf, '')}" for mrf in mrf_list])
     
     new_data = {
         "Timestamp": timestamp,
         "Patient_ID": patient_id,
         "Module": module_name,
-        "Supporting_Factors": ", ".join(supporting_factors) if supporting_factors else "",
-        "Risk_Factors": ", ".join(risk_factors) if risk_factors else "",
-        "Modifiable_Risk_Factors_Advice": mrf_full_text
     }
+
+    if module_name == "Peritonitis":
+        mrf_full_text = ""
+        if mrf_list and mrf_dict:
+            mrf_full_text = " | ".join([f"{mrf}: {mrf_dict.get(mrf, '')}" for mrf in mrf_list])
+        
+        new_data["Supporting_Factors"] = ", ".join(supporting_factors) if supporting_factors else ""
+        new_data["Risk_Factors"] = ", ".join(risk_factors) if risk_factors else ""
+        new_data["Modifiable_Risk_Factors_Advice"] = mrf_full_text
     
     for label, value in user_selections.items():
         if label != "Nama Pasien":
@@ -301,7 +304,7 @@ if selection == "Peritonitis Prediction":
             else:
                 mrf_full_text = ""
 
-            # === simpan data ke excel ===
+            # === simpan log ke excel ===
             id_anonim = save_prediction(
                 user_selections,
                 survival_rate,
@@ -342,7 +345,7 @@ if selection == "Peritonitis Prediction":
                 key="download_button"
             )
 
-            st.caption("*Sesuai protokol etik, nama pasien telah dianonimkan dalam database.*")
+            st.caption("⚠️*Sesuai protokol etik, nama pasien telah dianonimkan dalam database.*")
 
     if __name__ == "__main__":
         main()
@@ -352,7 +355,6 @@ elif selection == "CRRT Prediction":
     st.title("Survival Prediction Calculator for Pediatric CRRT")
 
     patient_name = st.text_input("Patient Name")
-    patient_id = st.text_input("Patient ID")
     date = datetime.now().strftime("%d-%m-%Y")
 
     variables = {
@@ -459,16 +461,33 @@ elif selection == "CRRT Prediction":
             outcome = "Survivor" if final_score >= 50 else "Non-Survivor"
             
             user_data["Nama Pasien"] = patient_name 
-            
-            id_anonim = save_prediction(user_data, final_score, outcome, "CRRT")
 
             if final_score >= 50:
                 st.success(f"The survival probability score is: {final_score:.2f}%")
             else:
                 st.error(f"The survival probability score is: {final_score:.2f}%")
             
-            st.info(f"Anonymized Patient ID: {id_anonim}") 
             st.info(f"Variables within the survivor criteria: ({', '.join(within_limit_vars)})")
+
+            id_anonim = save_prediction(user_data, final_score, outcome, "CRRT")
+        
+            data_download = {
+                "Date": date,
+                "Patient_ID": id_anonim,
+                "Survival_Probability": f"{final_score:.2f}%",
+                "Outcome": outcome,
+                **{k: v for k, v in user_data.items() if k != "Nama Pasien"}
+            }
+            
+            st.download_button(
+                label=f"**Download Hasil Prediksi** (Patient_ID: **{id_anonim}**)",
+                data=pd.DataFrame([data_download]).to_csv(index=False).encode('utf-8'),
+                file_name=f"Hasil_Prediksi_CRRT_{id_anonim}_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+                use_container_width=True,
+                key=f"crrt_prediction_{id_anonim}"
+            )
+            
             st.cache_data.clear()
         else:
             st.warning("No variables included in the calculation.")
