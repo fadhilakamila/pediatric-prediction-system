@@ -32,7 +32,7 @@ def save_prediction(user_selections, survival_rate, outcome, module_name, suppor
     
     file_path = 'PeritonitisPrediction_Database.xlsx' if module_name == "Peritonitis" else 'PredictCRRTforKids_Database.xlsx'
     tz_jkt = pytz.timezone('Asia/Jakarta')
-    timestamp = datetime.now(tz_jkt).strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now(pytz.utc).astimezone(tz_jkt).strftime("%Y-%m-%d %H:%M:%S")
     raw_name = user_selections.get("Nama Pasien", "Unknown")
     patient_id = hashlib.sha256(raw_name.encode()).hexdigest()[:8].upper() # ID unik = hash nama + waktu
     
