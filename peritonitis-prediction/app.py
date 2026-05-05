@@ -10,6 +10,7 @@ import os
 import streamlit_shadcn_ui as ui
 from streamlit_option_menu import option_menu
 from streamlit_gsheets import GSheetsConnection
+import pytz
 
 # === CACHE (data loading) ===
 @st.cache_data
@@ -30,7 +31,8 @@ def load_data(module):
 def save_prediction(user_selections, survival_rate, outcome, module_name, supporting_factors=None, risk_factors=None, mrf_list=None, mrf_dict=None):
     
     file_path = 'PeritonitisPrediction_Database.xlsx' if module_name == "Peritonitis" else 'PredictCRRTforKids_Database.xlsx'
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    tz_jkt = pytz.timezone('Asia/Jakarta')
+    timestamp = datetime.now(tz_jkt).strftime("%Y-%m-%d %H:%M:%S")
     raw_name = user_selections.get("Nama Pasien", "Unknown")
     patient_id = hashlib.sha256(raw_name.encode()).hexdigest()[:8].upper() # ID unik = hash nama + waktu
     
