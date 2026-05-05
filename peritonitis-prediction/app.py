@@ -9,6 +9,7 @@ from datetime import datetime
 import os
 import streamlit_shadcn_ui as ui
 from streamlit_option_menu import option_menu
+from streamlit_gsheets import GSheetsConnection
 
 # === CACHE (data loading) ===
 @st.cache_data
@@ -25,48 +26,72 @@ def load_data(module):
         st.error(f"Terjadi kesalahan saat membaca data: {e}")
         return pd.DataFrame()
 
-# === simpan log ke excel (database lokal) ===
+# === simpan ke excel (database lokal)  GSheets (database utama/cloud) ===
 def save_prediction(user_selections, survival_rate, outcome, module_name, supporting_factors=None, risk_factors=None, mrf_list=None, mrf_dict=None):
     
     file_path = 'PeritonitisPrediction_Database.xlsx' if module_name == "Peritonitis" else 'PredictCRRTforKids_Database.xlsx'
-    
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
     raw_name = user_selections.get("Nama Pasien", "Unknown")
     patient_id = hashlib.sha256(raw_name.encode()).hexdigest()[:8].upper() # ID unik = hash nama + waktu
     
     new_data = {
-        "Timestamp": timestamp,
-        "Patient_ID": patient_id,
         "Module": module_name,
+        "Timestamp": timestamp,
+        "Patient_ID": patient_id
     }
+
+    for label, value in user_selections.items():
+        if label != "Nama Pasien":
+            new_data[label] = value 
 
     if module_name == "Peritonitis":
         mrf_full_text = ""
         if mrf_list and mrf_dict:
             mrf_full_text = " | ".join([f"{mrf}: {mrf_dict.get(mrf, '')}" for mrf in mrf_list])
         
+        new_data["Survival Rate"] = f"{survival_rate:.2f}%"    
+        new_data["Outcome"] = outcome
         new_data["Supporting_Factors"] = ", ".join(supporting_factors) if supporting_factors else ""
         new_data["Risk_Factors"] = ", ".join(risk_factors) if risk_factors else ""
         new_data["Modifiable_Risk_Factors_Advice"] = mrf_full_text
-    
-    for label, value in user_selections.items():
-        if label != "Nama Pasien":
-            new_data[label] = value
-            
-    score_column = "Survival Rate" if module_name == "Peritonitis" else "survival probability"
-    new_data[score_column] = f"{survival_rate:.2f}%"
-    new_data["Outcome"] = outcome
+    else:
+        new_data["survival probability"] = f"{survival_rate:.2f}%"
+        new_data["Outcome"] = outcome
     
     new_df = pd.DataFrame([new_data])
     
-    if os.path.exists(file_path):
-        existing_df = pd.read_excel(file_path)
-        updated_df = pd.concat([existing_df, new_df], ignore_index=True)
-    else:
-        updated_df = new_df
+    # 1. simpan ke excel (database lokal)
+    try:
+        if os.path.exists(file_path):
+            existing_df = pd.read_excel(file_path)
+            updated_df = pd.concat([existing_df, new_df], ignore_index=True)
+        else:
+            updated_df = new_df
+        updated_df.to_excel(file_path, index=False)
+    except Exception as e:
+        st.error(f"Gagal menyimpan backup lokal: {e}")
+
+    # 2. simpan ke google sheets (database cloud)
+    try:
+        # Inisialisasi koneksi (Membuka koneksi menggunakan secrets yang tadi dibuat)
+        conn = st.connection("gsheets", type=GSheetsConnection)
         
-    updated_df.to_excel(file_path, index=False)
+        # Baca data yang sudah ada di cloud (worksheet sesuai nama modul, yaitu sheets bernama "Peritonitis" dan "CRRT"
+        existing_gsheet = conn.read(worksheet=module_name)
+        
+        # Jika sheet kosong, langsung gunakan data baru. Jika sheets sudah ada isinya, gabungkan.
+        if existing_gsheet is not None and not existing_gsheet.empty:
+            updated_gsheet = pd.concat([existing_gsheet, new_df], ignore_index=True)
+        else:
+            updated_gsheet = new_df
+        
+        # Update lagi data yang sudah di-update ke GSheets
+        conn.update(worksheet=module_name, data=updated_gsheet)
+
+    except Exception as e:
+        # Jika internet mati, program tidak crash tapi memberi info
+        st.warning(f"Gagal sinkronisasi ke Google Sheets (Mode Offline): {e}")
+
     return patient_id
 
 # === PASSWORD ===
