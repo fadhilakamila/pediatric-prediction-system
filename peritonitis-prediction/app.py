@@ -13,18 +13,18 @@ from streamlit_gsheets import GSheetsConnection
 import pytz
 
 # === CACHE (data loading) ===
-@st.cache_data
-def load_data(module):
-
-    file_path = 'PeritonitisPrediction_Database.xlsx' if module == "Peritonitis" else 'PredictCRRTforKids_Database.xlsx'
-
+@st.cache_data(ttl=600)
+def load_data(module_name):
     try:
-        df = pd.read_excel(file_path)
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        df = conn.read(worksheet=module_name)
+        
+        if df is not None:
+            df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+            
         return df
-    except FileNotFoundError:
-        return pd.DataFrame()
     except Exception as e:
-        st.error(f"Terjadi kesalahan saat membaca data: {e}")
+        st.error(f"Gagal mengambil data dari database: {e}")
         return pd.DataFrame()
 
 # === simpan ke excel (database lokal)  GSheets (database utama/cloud) ===
@@ -121,8 +121,12 @@ def check_password():
             st.text_input("Password", type="password", key="password")
             st.form_submit_button("Login", on_click=password_entered, use_container_width=True)
 
-        if "password_correct" in st.session_state:
+        if st.session_state.get("password_correct") == False:
             st.error("Username atau password salah.")
+
+        if st.session_state.get("logout_success"):
+            st.success("Anda berhasil logout.")
+            del st.session_state["logout_success"]
             
     return False
 
@@ -164,9 +168,14 @@ with st.sidebar:
 
     # === LOGOUT ===
     if st.button("Log out", use_container_width=True, type="secondary"):
-        st.session_state["password_correct"] = False
+        st.cache_data.clear()
+        if "password_correct" in st.session_state:
+            del st.session_state["password_correct"]
+        st.session_state["logout_success"] = True
+        st.toast("Anda berhasil logout!")
+        import time
+        time.sleep(2.5)
         st.rerun()
-        st.success("Anda berhasil logout")
 
 # === PERITONITIS PREDICTION ===
 if selection == "Peritonitis Prediction":
@@ -194,17 +203,17 @@ if selection == "Peritonitis Prediction":
     ]
 
     mrf_explanations = {
-        "Housing": "Perlu perbaikan sanitasi dan fasilitas lingkungan tempat tinggal untuk mengurangi risiko kontaminasi kuman dari lingkungan.",
-        "Nutrition": "Perlu peningkatan asupan nutrisi dan pemantauan status gizi secara berkala oleh ahli gizi anak untuk mencapai status gizi normal.",
-        "Socioeconomic": "Perlu dukungan biaya kesehatan atau bantuan pekerja sosial untuk memastikan kepatuhan terapi dan ketersediaan logistik dialisis.",
-        "Performed CAPD": "Perlu pelatihan ulang yang intensif bagi orang yang melakukan dialisis (pasien/keluarga) mengenai prosedur aseptik yang benar.",
-        "Gastronomy Device": "Perlu perawatan ekstra dan pembersihan ketat pada area lubang alat tambahan di perut untuk mencegah infeksi silang ke area kateter.",
+        "Housing": "Pastikan ada ruangan khusus yang bersih (minim debu/hewan peliharaan) untuk melakukan pertukaran cairan, serta ketersediaan wastafel dengan air mengalir di dalam ruangan tersebut untuk antisepsis tangan. [Sumber](https://www.scielo.br/j/jbn/a/hHtvqSXhwcCtvBnNqk9JBzk/?lang=en&format=pdf)",
+        "Nutrition": "Berikan asupan protein tinggi sesuai target usia (biasanya 1.4–3.0 g/kg/hari untuk anak) guna mengejar pertumbuhan dan mengganti protein yang hilang saat dialisis. [Sumber 1](https://pmc.ncbi.nlm.nih.gov/articles/PMC7352713/) [Sumber 2](https://pmc.ncbi.nlm.nih.gov/articles/PMC6904418/)",
+        "Socioeconomic": "Edukasi atau retraining intensif bagi keluarga (caregiver) mengenai prosedur aseptik sangat dianjurkan, terutama bagi keluarga dengan keterbatasan akses informasi. [Sumber](https://www.researchgate.net/publication/45276240_Peritonitis_in_children_on_peritoneal_dialysis_in_Cape_Town_South_Africa_Epidemiology_and_risks)",
+        "Performed CAPD": "Gunakan sistem Y-set atau twin-bag yang terbukti menurunkan risiko infeksi secara signifikan dibandingkan sistem lama. [Sumber](https://www.scielo.br/j/jbn/a/hHtvqSXhwcCtvBnNqk9JBzk/?lang=en&format=pdf)",
+        "Gastronomy Device": "Perawatan luka gastrostomi yang ketat dan pemisahan jadwal perawatan selang makan dengan jadwal dialisis untuk mencegah kontaminasi silang. [Sumber](https://www.researchgate.net/publication/347147851_Growth_and_nutritional_management_of_children_on_peritoneal_dialysis)",
         "Stunting": "Perlu optimalisasi pertumbuhan melalui dukungan nutrisi agresif atau terapi hormon pertumbuhan sesuai saran dokter.",
-        "Starting PD <2 weeks after placement": "Sebaiknya menunda dimulainya dialisis (jika kondisi klinis memungkinkan) minimal 2 minggu setelah operasi agar luka kateter sembuh sempurna.",
-        "Peritonitis in ESI": "Perlu penanganan agresif dan segera terhadap infeksi area keluar kateter (Exit Site Infection) agar kuman tidak masuk ke rongga perut.",
-        "Type of Catheter (Cuff)": "Disarankan menggunakan kateter dengan 'Double Cuff' karena memberikan perlindungan ganda (barier bakteri) yang lebih baik.",
-        "Type of Catheter (Shape)": "Penggunaan kateter berbentuk 'Coiled' atau 'Swan-neck' lebih disarankan untuk mengurangi risiko kateter berpindah posisi (displacement).",
-        "Catheter Placement": "Berdasarkan hasil meta-analisis, metode 'Open' pada populasi ini menunjukkan kecenderungan risiko peritonitis yang lebih rendah dibandingkan 'Laparoscopic'. Konsultasikan untuk teknik yang paling sesuai."
+        "Starting PD <2 weeks after placement": "Idealnya dialisis dimulai setelah 2 minggu pasca operasi untuk memberi waktu penyembuhan jaringan (healing time), kecuali dalam kondisi darurat medis. [Sumber](https://www.ouh.nhs.uk/media/imhpcx55/96865catheter.pdf)",
+        "Peritonitis in ESI": "Gunakan salep antibiotik topikal (seperti mupirocin atau gentamisin) pada exit site secara rutin dan pembersihan area dengan cairan antiseptik non-iritan. [Sumber](https://journals.eco-vector.com/2075-3594/article/view/637454)",
+        "Type of Catheter (Cuff)": "Penggunaan kateter dengan double-cuff lebih disarankan daripada single-cuff untuk mencegah migrasi bakteri ke rongga perut. Letak exit site harus menghadap ke bawah atau ke samping (bukan ke atas) untuk mencegah masuknya air atau kotoran. [Sumber 1](https://pubmed.ncbi.nlm.nih.gov/37232412/) [Sumber 2](https://journals.eco-vector.com/2075-3594/article/view/637454)",
+        "Type of Catheter (Shape)": "Penggunaan kateter dengan double-cuff lebih disarankan daripada single-cuff untuk mencegah migrasi bakteri ke rongga perut. Letak exit site harus menghadap ke bawah atau ke samping (bukan ke atas) untuk mencegah masuknya air atau kotoran. [Sumber 1](https://pubmed.ncbi.nlm.nih.gov/37232412/) [Sumber 2](https://journals.eco-vector.com/2075-3594/article/view/637454)",
+        "Catheter Placement": "Penggunaan kateter dengan double-cuff lebih disarankan daripada single-cuff untuk mencegah migrasi bakteri ke rongga perut. Letak exit site harus menghadap ke bawah atau ke samping (bukan ke atas) untuk mencegah masuknya air atau kotoran. [Sumber 1](https://pubmed.ncbi.nlm.nih.gov/37232412/) [Sumber 2](https://journals.eco-vector.com/2075-3594/article/view/637454)"
     }
 
     def main():
