@@ -164,7 +164,15 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
     
-    st.space()
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    st.info("""
+        **⚠️ Peringatan**
+        
+        Sistem ini dikembangkan menggunakan pengetahuan dari meta-analisis studi peritonitis pediatri. Aplikasi ini berfungsi sebagai alat bantu dan bukan pengganti keputusan akhir dari Dokter Spesialis Anak Konsultan Nefrologi.
+    """)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
 
     # === LOGOUT ===
     if st.button("Log out", use_container_width=True, type="secondary"):
@@ -202,9 +210,10 @@ if selection == "Peritonitis Prediction":
         {"label": "Stunting", "non-peritonitis": "No stunting", "peritonitis": "Stunting", "p_val": 0.32, "rr": 0.72, "mrf": True},
     ]
 
+    # 🔗
     mrf_explanations = {
-        "Housing": "Pastikan ada ruangan khusus yang bersih (minim debu/hewan peliharaan) untuk melakukan pertukaran cairan, serta ketersediaan wastafel dengan air mengalir di dalam ruangan tersebut untuk antisepsis tangan. [Sumber](https://www.scielo.br/j/jbn/a/hHtvqSXhwcCtvBnNqk9JBzk/?lang=en&format=pdf)",
-        "Nutrition": "Berikan asupan protein tinggi sesuai target usia (biasanya 1.4–3.0 g/kg/hari untuk anak) guna mengejar pertumbuhan dan mengganti protein yang hilang saat dialisis. [Sumber 1](https://pmc.ncbi.nlm.nih.gov/articles/PMC7352713/) [Sumber 2](https://pmc.ncbi.nlm.nih.gov/articles/PMC6904418/)",
+        "Housing": "Ruangan harus bersih dan bebas dari hewan peliharaan selama prosedur untuk menghindari risiko kontaminasi bakteri Pasteurella atau kerusakan mekanis pada selang. Ketersediaan wastafel untuk mencuci tangan secara benar sangat krusial dalam mengurangi risiko peritonitis. [🔗Sumber 1](https://freseniusmedicalcare.com/content/dam/home-products-education/steps2home-pd/Preventing_Peritonitis.pdf) [🔗Sumber 2](https://spnp-spp.pt/media/rqdpbrom/catheter-related-infections-and-peritonitis-in-pediatric-patients-receiving-peritoneal-dialysis-guideline-for-prevention-and-treatment-2012-1-_compressed-1.pdf) [Sumber 3](https://www.ouh.nhs.uk/media/agxhnni2/85713pdialysis.pdf) [Sumber 4](https://www.satellitehealthcare.com/blog/pets-and-peritoneal-dialysis-absolutely/)",
+        "Nutrition": "Rekomendasi asupan protein tinggi (1,4–3,0 g/kg/hari) disesuaikan dengan usia anak untuk mengganti kehilangan protein selama dialisis dan mengejar pertumbuhan. Pemantauan nutrisi dilakukan setiap bulan pada bayi dan setiap 3–4 bulan pada anak yang lebih tua. [Sumber 1](https://pmc.ncbi.nlm.nih.gov/articles/PMC7352713/) [Sumber 2](https://pmc.ncbi.nlm.nih.gov/articles/PMC6904418/)",
         "Socioeconomic": "Edukasi atau retraining intensif bagi keluarga (caregiver) mengenai prosedur aseptik sangat dianjurkan, terutama bagi keluarga dengan keterbatasan akses informasi. [Sumber](https://www.researchgate.net/publication/45276240_Peritonitis_in_children_on_peritoneal_dialysis_in_Cape_Town_South_Africa_Epidemiology_and_risks)",
         "Performed CAPD": "Gunakan sistem Y-set atau twin-bag yang terbukti menurunkan risiko infeksi secara signifikan dibandingkan sistem lama. [Sumber](https://www.scielo.br/j/jbn/a/hHtvqSXhwcCtvBnNqk9JBzk/?lang=en&format=pdf)",
         "Gastronomy Device": "Perawatan luka gastrostomi yang ketat dan pemisahan jadwal perawatan selang makan dengan jadwal dialisis untuk mencegah kontaminasi silang. [Sumber](https://www.researchgate.net/publication/347147851_Growth_and_nutritional_management_of_children_on_peritoneal_dialysis)",
@@ -217,22 +226,36 @@ if selection == "Peritonitis Prediction":
     }
 
     def main():
-        st.title("Prediksi Survival Rate Pasien Pediatri Peritoneal Dialysis")
-        st.markdown("---")
-        st.markdown("#### Masukkan Kondisi Klinis Pasien!")
+        st.title("Prediksi Survival Rate Peritoneal Dialysis pada Pasien Anak")
         patient_name = st.text_input("Nama Pasien", placeholder="Masukkan nama...")
         
+        # st.caption("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh signifikan berdasarkan hasil meta-analisis.")
+        st.markdown("#### Pilih Sesuai dengan Kondisi Pasien")
+
+        significant_vars = ["Age", "Duration of PD", "Peritonitis in ESI", "Cause of ESRD"]
+        
+        survival_rate = None
+        outcome = None
+        xai_supporting_peritonitis = []
+        xai_supporting_non_peritonitis = []
+        modifiable_risk_factors = []
+        mrf_full_text=""
+
         col1, col2 = st.columns(2)
         user_selections = {}
 
         for i, var in enumerate(variables_data):
             target_col = col1 if i < 9 else col2
-            label = f"{i+1}. {var['label']}"
+
+            is_significant = "*" if var['label'] in significant_vars else ""
+            label = f"{i+1}. {var['label']}{is_significant}"
+
             options = [var['non-peritonitis'], var['peritonitis']]
-            
             choice = target_col.selectbox(label, options, index=0)
             user_selections[var['label']] = choice
 
+        st.caption("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh signifikan berdasarkan hasil meta-analisis.")
+        
         if st.button("Hitung Survival Rate"):
             if not patient_name:
                 st.warning("Silakan masukkan nama pasien terlebih dahulu.")
@@ -243,10 +266,6 @@ if selection == "Peritonitis Prediction":
             # === PERHITUNGAN WEIGHTED AVERAGE ===
             total_wi_xi = 0
             total_wi = 0
-            
-            xai_supporting_non_peritonitis = []
-            xai_supporting_peritonitis = []
-            modifiable_risk_factors = []
 
             for var in variables_data:
                 # Bobot (wi)
@@ -260,10 +279,13 @@ if selection == "Peritonitis Prediction":
                 total_wi += weight
 
                 # === PERSIAPAN DATA XAI === 
+                is_sig = "*" if var['label'] in significant_vars else ""
+                display_label = f"{var['label']}{is_sig}"
+
                 if x_val == 0:
-                    xai_supporting_non_peritonitis.append(var['label'])
+                    xai_supporting_non_peritonitis.append(display_label)
                 else:
-                    xai_supporting_peritonitis.append(var['label'])
+                    xai_supporting_peritonitis.append(display_label)
 
                 if var['mrf'] and x_val == 1:
                     modifiable_risk_factors.append(var['label'])
@@ -320,25 +342,18 @@ if selection == "Peritonitis Prediction":
                             ui.element("p", children=[f"• {item}"], className="text-sm text-gray-700 m-1", key=f"list_risk{idx}")
                     else:
                         ui.element("p", children=["Risiko terpantau rendah."], className="text-sm text-gray-400 m-1", key="none_risk")
+    
+            st.caption("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh signifikan berdasarkan hasil meta-analisis.")
 
             if modifiable_risk_factors:
                 st.markdown("##### Modifiable Risk Factors (MRF)")
                 st.write("Berikut adalah rekomendasi intervensi yang dapat diambil untuk meningkatkan peluang survival")
-                
-                mrf_full_text = " | ".join([f"{mrf}: {mrf_explanations.get(mrf, '')}" for mrf in modifiable_risk_factors])
 
-                accordion_data = []
-                for mrf in modifiable_risk_factors:
-                    penjelasan = mrf_explanations.get(mrf, "Perlu konsultasi lebih lanjut dengan dokter spesialis.")
-                    accordion_data.append({
-                        "trigger": f"{mrf}", 
-                        "content": penjelasan
-                    })
+            for mrf in modifiable_risk_factors:
+                penjelasan = mrf_explanations.get(mrf, "Perlu konsultasi lebih lanjut dengan dokter spesialis.")
                 
-                if accordion_data:
-                    ui.accordion(data=accordion_data, key="mrf_accordion")
-            else:
-                mrf_full_text = ""
+                with st.expander(f"**{mrf}**"):
+                    st.markdown(penjelasan) 
 
             # === simpan log ke excel ===
             id_anonim = save_prediction(
@@ -372,17 +387,20 @@ if selection == "Peritonitis Prediction":
             
             df_single_patient = pd.DataFrame([data_single_patient])
                 
+            st.space()
+
             st.download_button(
                 label=f"**Download Hasil Prediksi** (ID Pasien: **{id_anonim}**)",
                 data=df_single_patient.to_csv(index=False).encode('utf-8'),
                 file_name=f"Hasil_Prediksi_Peritonitis_{id_anonim}_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv",
                 use_container_width=True,
-                key="download_button"
+                key="download_button",
+                icon=":material/download:"
             )
 
             st.caption("⚠️*Sesuai protokol etik, nama pasien telah dianonimkan dalam database.*")
-
+    
     if __name__ == "__main__":
         main()
 
@@ -521,7 +539,8 @@ elif selection == "CRRT Prediction":
                 file_name=f"Hasil_Prediksi_CRRT_{id_anonim}_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv",
                 use_container_width=True,
-                key=f"crrt_prediction_{id_anonim}"
+                key=f"crrt_prediction_{id_anonim}",
+                icon=":material/download:"
             )
             
             st.cache_data.clear()
