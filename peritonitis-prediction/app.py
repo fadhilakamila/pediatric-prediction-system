@@ -166,14 +166,6 @@ with st.sidebar:
     
     st.markdown("<br>", unsafe_allow_html=True)
 
-    st.info("""
-        **⚠️ Peringatan**
-        
-        Sistem ini dikembangkan menggunakan pengetahuan dari meta-analisis studi peritonitis pediatri. Aplikasi ini berfungsi sebagai alat bantu dan bukan pengganti keputusan akhir dari Dokter Spesialis Anak Konsultan Nefrologi.
-    """)
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-
     # === LOGOUT ===
     if st.button("Log out", use_container_width=True, type="secondary"):
         st.cache_data.clear()
@@ -184,6 +176,24 @@ with st.sidebar:
         import time
         time.sleep(2.5)
         st.rerun()
+
+    st.sidebar.markdown(f"""
+    <div style="
+        background-color: #e8f0fe; 
+        padding: 15px; 
+        border-radius: 10px; 
+        border-left: 5px solid #1a73e8;
+        color: #1a73e8;
+        font-size: 0.9rem;
+        line-height: 1.3;
+    ">
+        <strong>⚠️ Peringatan</strong><br>
+        Sistem ini dikembangkan menggunakan pengetahuan dari meta-analisis studi peritonitis pediatri.<br>
+        Aplikasi ini berfungsi sebagai alat bantu dan bukan pengganti keputusan akhir dari Dokter Spesialis Anak Konsultan Nefrologi.
+    </div>
+    """, unsafe_allow_html=True) 
+    
+    st.markdown("<br>", unsafe_allow_html=True)
 
 # === PERITONITIS PREDICTION ===
 if selection == "Peritonitis Prediction":
@@ -217,6 +227,7 @@ if selection == "Peritonitis Prediction":
         "Socioeconomic": "Edukasi atau retraining intensif bagi keluarga (caregiver) mengenai prosedur aseptik sangat dianjurkan, terutama bagi keluarga dengan keterbatasan akses informasi. [Sumber](https://www.researchgate.net/publication/45276240_Peritonitis_in_children_on_peritoneal_dialysis_in_Cape_Town_South_Africa_Epidemiology_and_risks)",
         "Performed CAPD": "Gunakan sistem Y-set atau twin-bag yang terbukti menurunkan risiko infeksi secara signifikan dibandingkan sistem lama. [Sumber](https://www.scielo.br/j/jbn/a/hHtvqSXhwcCtvBnNqk9JBzk/?lang=en&format=pdf)",
         "Gastronomy Device": "Perawatan luka gastrostomi yang ketat dan pemisahan jadwal perawatan selang makan dengan jadwal dialisis untuk mencegah kontaminasi silang. [Sumber](https://www.researchgate.net/publication/347147851_Growth_and_nutritional_management_of_children_on_peritoneal_dialysis)",
+        "Catheter Orientation": "belum ada",
         "Stunting": "Stunting pada anak dialisis bukan hanya disebabkan oleh asupan kalori yang rendah, tetapi juga oleh asidosis metabolik, anemia, osteodistrofi ginjal, dan resistensi terhadap hormon pertumbuhan. Intervensi pertama adalah memastikan kecukupan dialisis dan koreksi parameter metabolik seperti asidosis dan hiperparatiroidisme.Jika pertumbuhan masih belum optimal meskipun parameter metabolik telah terkendali dan asupan nutrisi sudah mencapai target, terapi dengan hormon pertumbuhan manusia rekombinan (rhGH) dapat dipertimbangkan. Selain itu, dukungan nutrisi intensif dan klirens dialisis yang adekuat pada pasien prepubertal dapat mempromosikan pertumbuhan normal tanpa selalu memerlukan rhGH. Pada anak yang mengalami stunting (tinggi badan < persentil ke-2), perhitungan kebutuhan energi dan mikronutrien harus didasarkan pada height-age pasien, bukan chronological age-nya, untuk memberikan dukungan yang sesuai dengan ukuran tubuh aktualnya. [Sumber 1](https://pmc.ncbi.nlm.nih.gov/articles/PMC6904418/) [Sumber 2](https://pmc.ncbi.nlm.nih.gov/articles/PMC6904418/)",
         "Starting PD <2 weeks after placement": "Idealnya dialisis dimulai setelah 2 minggu pasca operasi untuk memberi waktu penyembuhan jaringan (healing time), kecuali dalam kondisi darurat medis. [Sumber](https://www.ouh.nhs.uk/media/imhpcx55/96865catheter.pdf)",
         "Peritonitis in ESI": "Gunakan salep antibiotik topikal (seperti mupirocin atau gentamisin) pada exit site secara rutin dan pembersihan area dengan cairan antiseptik non-iritan. [Sumber](https://journals.eco-vector.com/2075-3594/article/view/637454)",
@@ -229,7 +240,7 @@ if selection == "Peritonitis Prediction":
         st.title("Prediksi Survival Rate Peritoneal Dialysis pada Pasien Anak")
         patient_name = st.text_input("Nama Pasien", placeholder="Masukkan nama...")
         
-        # st.caption("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh signifikan berdasarkan hasil meta-analisis.")
+        # st.caption("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh **signifikan** berdasarkan hasil meta-analisis.")
         st.markdown("#### Pilih Sesuai dengan Kondisi Pasien")
 
         significant_vars = ["Age", "Duration of PD", "Peritonitis in ESI", "Cause of ESRD"]
@@ -254,7 +265,7 @@ if selection == "Peritonitis Prediction":
             choice = target_col.selectbox(label, options, index=0)
             user_selections[var['label']] = choice
 
-        st.caption("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh signifikan berdasarkan hasil meta-analisis.")
+        st.write("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh **signifikan** berdasarkan hasil meta-analisis.")
         
         if st.button("Hitung Survival Rate"):
             if not patient_name:
