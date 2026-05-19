@@ -1,5 +1,5 @@
 """
-TA | Peritonitis Prediction Calculator
+TA | Peritonitis & CRRT Prediction Calculator
 """
 import streamlit as st
 import pandas as pd
@@ -28,7 +28,7 @@ def load_data(module_name):
         return pd.DataFrame()
 
 # === simpan ke excel (database lokal)  GSheets (database utama/cloud) ===
-def save_prediction(user_selections, survival_rate, outcome, module_name, supporting_factors=None, risk_factors=None, mrf_list=None, mrf_dict=None):
+def save_prediction(user_selections, prediction_rate, outcome, module_name, protective_factors=None, risk_factors=None, mrf_list=None, mrf_dict=None):
     
     file_path = 'PeritonitisPrediction_Database.xlsx' if module_name == "Peritonitis" else 'PredictCRRTforKids_Database.xlsx'
     tz_jkt = pytz.timezone('Asia/Jakarta')
@@ -51,13 +51,13 @@ def save_prediction(user_selections, survival_rate, outcome, module_name, suppor
         if mrf_list and mrf_dict:
             mrf_full_text = " | ".join([f"{mrf}: {mrf_dict.get(mrf, '')}" for mrf in mrf_list])
         
-        new_data["Survival Rate"] = f"{survival_rate:.2f}%"    
-        new_data["Outcome"] = outcome
-        new_data["Supporting_Factors"] = ", ".join(supporting_factors) if supporting_factors else ""
+        new_data["Peritonitis_Risk_Rate"] = f"{prediction_rate:.2f}%"    
+        new_data["Category_Outcome"] = outcome
+        new_data["Protective_Factors"] = ", ".join(protective_factors) if protective_factors else ""
         new_data["Risk_Factors"] = ", ".join(risk_factors) if risk_factors else ""
         new_data["Modifiable_Risk_Factors_Advice"] = mrf_full_text
     else:
-        new_data["survival probability"] = f"{survival_rate:.2f}%"
+        new_data["survival probability"] = f"{prediction_rate:.2f}%"
         new_data["Outcome"] = outcome
     
     new_df = pd.DataFrame([new_data])
@@ -198,7 +198,7 @@ with st.sidebar:
 # === PERITONITIS PREDICTION ===
 if selection == "Peritonitis Prediction":
     # --- KNOWLEDGE BASE (sesuai decision table) ---
-    # x=1 jika mendukung Non-Survivor (Peritonitis), x=0 jika mendukung Survivor.
+    # x=1 jika berisiko tinggi peritonitis, x=0 jika berisiko rendah peritonitis
     variables_data = [
         {"label": "Age", "non-peritonitis": ">2 yo", "peritonitis": "<2 yo", "p_val": 0.002, "rr": 1.4, "mrf": False},
         {"label": "Gender", "non-peritonitis": "Female", "peritonitis": "Male", "p_val": 0.09, "rr": 1.08, "mrf": False},
@@ -237,15 +237,14 @@ if selection == "Peritonitis Prediction":
     }
 
     def main():
-        st.title("Prediksi Survival Rate Peritoneal Dialysis pada Pasien Anak")
+        st.title("Sistem Prediksi Risiko Peritonitis pada Pasien (Anak) *Peritoneal Dialysis*")
         patient_name = st.text_input("Nama Pasien", placeholder="Masukkan nama...")
         
-        # st.caption("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh **signifikan** terhadap peritonitis (berdasarkan hasil meta-analisis).")
         st.markdown("#### Pilih Sesuai dengan Kondisi Pasien")
 
         significant_vars = ["Age", "Duration of PD", "Peritonitis in ESI", "Cause of ESRD"]
         
-        survival_rate = None
+        peritonitis_risk_rate = None
         outcome = None
         xai_supporting_peritonitis = []
         xai_supporting_non_peritonitis = []
@@ -265,9 +264,9 @@ if selection == "Peritonitis Prediction":
             choice = target_col.selectbox(label, options, index=0)
             user_selections[var['label']] = choice
 
-        st.write("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh **signifikan** terhadap peritonitis (berdasarkan hasil meta-analisis).")
+        st.caption("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh **signifikan** terhadap peritonitis (berdasarkan hasil meta-analisis).")
         
-        if st.button("Hitung Survival Rate"):
+        if st.button("Hitung Tingkat Risiko"):
             if not patient_name:
                 st.warning("Silakan masukkan nama pasien terlebih dahulu.")
                 return
@@ -302,30 +301,28 @@ if selection == "Peritonitis Prediction":
                     modifiable_risk_factors.append(var['label'])
 
             # Rumus Kejadian Peritonitis
-            kejadian_peritonitis = total_wi_xi / total_wi
-            # Rumus Survival Rate (SR)
-            survival_rate = (1 - kejadian_peritonitis) * 100
+            peritonitis_risk_rate = (total_wi_xi / total_wi) * 100
             
             st.markdown("---")
 
             # === Hasil Prediksi ===
-            if survival_rate >= 50:
-                color_code = "#22c55e"
-                status_label = "🟢SURVIVOR"
-                status_text = "≥ 50%"
-                outcome = "Survivor"
-            else:
+            if peritonitis_risk_rate >= 50:
                 color_code = "#f97316"
-                status_label = "🟠NON-SURVIVOR"
+                status_label = "🟠BERISIKO TINGGI PERITONITIS"
+                status_text = "≥ 50%"
+                outcome = "Berisiko Tinggi Peritonitis"
+            else:
+                color_code = "#22c55e"
+                status_label = "🟢BERISIKO RENDAH PERITONITIS"
                 status_text = "< 50%"
-                outcome = "Non-Survivor"
+                outcome = "Berisiko Rendah Peritonitis"
             
             st.markdown(f"""
                 <div style="line-height: 1.0;">
                     <h3 style="margin-bottom: 4px; padding-bottom: 0px;">Hasil Prediksi <i>{patient_name}</i></h3>
-                    <h1 style="color: {color_code}; margin-top: 0px; margin-bottom: 4px; padding: 0px; font-weight: bold;">{survival_rate:.2f}%</h1>
+                    <h1 style="color: {color_code}; margin-top: 0px; margin-bottom: 4px; padding: 0px; font-weight: bold;">{peritonitis_risk_rate:.2f}%</h1>
                     <p style="margin-top: 0px; font-size: 0.85rem; color: gray; font-style: italic;">
-                        Pasien dikategorikan sebagai <b>{status_label}</b> karena Survival Rate {status_text}
+                        Pasien termasuk kategori <b>{status_label}</b> karena tingkat risiko {status_text}
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -333,20 +330,20 @@ if selection == "Peritonitis Prediction":
             expl_col1, expl_col2 = st.columns(2)
 
             with expl_col1:
-                with ui.card(key="card_survival"):
-                    ui.element("span", children=["Faktor Pendukung Survival"], className="text-black text-sm font-bold m-1", key="label_surv")
-                    ui.element("p", children=["Variabel dengan Risk Ratio (RR) < 1"], className="text-gray-400 text-xs m-1", key="desc_surv")
+                with ui.card(key="card_protective"):
+                    ui.element("span", children=["Faktor Protektif Peritonitis"], className="text-black text-sm font-bold m-1", key="label_prot")
+                    ui.element("p", children=["Variabel yang menjauhkan pasien dari risiko peritonitis (RR < 1)"], className="text-gray-400 text-xs m-1", key="desc_prot")
                     
                     if xai_supporting_non_peritonitis:
                         for idx, item in enumerate(xai_supporting_non_peritonitis):
-                            ui.element("p", children=[f"• {item}"], className="text-sm text-gray-700 m-1", key=f"list_surv{idx}")
+                            ui.element("p", children=[f"• {item}"], className="text-sm text-gray-700 m-1", key=f"list_prot{idx}")
                     else:
-                        ui.element("p", children=["Tidak ada faktor spesifik."], className="text-sm text-gray-400 m-1", key="none_surv")
+                        ui.element("p", children=["Tidak ada protective factors spesifik."], className="text-sm text-gray-400 m-1", key="none_prot")
 
             with expl_col2:
                 with ui.card(key="card_risk"):
-                    ui.element("span", children=["Faktor Penyebab Peritonitis"], className="text-black text-sm font-bold m-1", key="label_risk")
-                    ui.element("p", children=["Variabel dengan Risk Ratio (RR) > 1"], className="text-gray-400 text-xs m-1", key="desc_risk")
+                    ui.element("span", children=["Faktor Pemicu Peritonitis"], className="text-black text-sm font-bold m-1", key="label_risk")
+                    ui.element("p", children=["Variabel yang memperberat risiko peritonitis (RR > 1)"], className="text-gray-400 text-xs m-1", key="desc_risk")
                     
                     if xai_supporting_peritonitis:
                         for idx, item in enumerate(xai_supporting_peritonitis):
@@ -356,9 +353,11 @@ if selection == "Peritonitis Prediction":
     
             st.caption("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh **signifikan** terhadap peritonitis (berdasarkan hasil meta-analisis).")
 
+            st.space()
+
             if modifiable_risk_factors:
                 st.markdown("##### Modifiable Risk Factors (MRF)")
-                st.write("Berikut adalah rekomendasi intervensi yang dapat diambil untuk meningkatkan peluang survival")
+                st.write("Berikut adalah rekomendasi intervensi yang dapat diambil untuk meminimalkan pemicu risiko peritonitis.")
 
             for mrf in modifiable_risk_factors:
                 penjelasan = mrf_explanations.get(mrf, "Perlu konsultasi lebih lanjut dengan Dokter Spesialis Anak Konsultan Nefrologi.")
@@ -369,10 +368,10 @@ if selection == "Peritonitis Prediction":
             # === simpan log ke excel ===
             id_anonim = save_prediction(
                 user_selections,
-                survival_rate,
+                peritonitis_risk_rate,
                 outcome,
                 "Peritonitis",
-                supporting_factors=xai_supporting_non_peritonitis,
+                protective_factors=xai_supporting_non_peritonitis,
                 risk_factors=xai_supporting_peritonitis,
                 mrf_list=modifiable_risk_factors,
                 mrf_dict=mrf_explanations
@@ -386,9 +385,9 @@ if selection == "Peritonitis Prediction":
                 "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "Patient_ID": id_anonim,
                 **{k: v for k, v in user_selections.items() if k != "Nama Pasien"},
-                "Survival_Rate": f"{survival_rate:.2f}%",
-                "Outcome": outcome,
-                "Supporting_Factors": ", ".join(xai_supporting_non_peritonitis) if xai_supporting_non_peritonitis else "",
+                "Peritonitis_Risk_Rate": f"{peritonitis_risk_rate:.2f}%",
+                "Outcome_Category": outcome,
+                "Protective_Factors": ", ".join(xai_supporting_non_peritonitis) if xai_supporting_non_peritonitis else "",
                 "Risk_Factors": ", ".join(xai_supporting_peritonitis) if xai_supporting_peritonitis else "",
                 "Modifiable_Risk_Factors_Advice": mrf_full_text
             }
