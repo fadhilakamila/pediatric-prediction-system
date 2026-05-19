@@ -240,7 +240,7 @@ if selection == "Peritonitis Prediction":
         st.title("Prediksi Survival Rate Peritoneal Dialysis pada Pasien Anak")
         patient_name = st.text_input("Nama Pasien", placeholder="Masukkan nama...")
         
-        # st.caption("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh **signifikan** berdasarkan hasil meta-analisis.")
+        # st.caption("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh **signifikan** terhadap peritonitis (berdasarkan hasil meta-analisis).")
         st.markdown("#### Pilih Sesuai dengan Kondisi Pasien")
 
         significant_vars = ["Age", "Duration of PD", "Peritonitis in ESI", "Cause of ESRD"]
@@ -265,7 +265,7 @@ if selection == "Peritonitis Prediction":
             choice = target_col.selectbox(label, options, index=0)
             user_selections[var['label']] = choice
 
-        st.write("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh **signifikan** berdasarkan hasil meta-analisis.")
+        st.write("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh **signifikan** terhadap peritonitis (berdasarkan hasil meta-analisis).")
         
         if st.button("Hitung Survival Rate"):
             if not patient_name:
@@ -354,7 +354,7 @@ if selection == "Peritonitis Prediction":
                     else:
                         ui.element("p", children=["Risiko terpantau rendah."], className="text-sm text-gray-400 m-1", key="none_risk")
     
-            st.caption("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh signifikan berdasarkan hasil meta-analisis.")
+            st.caption("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh **signifikan** terhadap peritonitis (berdasarkan hasil meta-analisis).")
 
             if modifiable_risk_factors:
                 st.markdown("##### Modifiable Risk Factors (MRF)")
