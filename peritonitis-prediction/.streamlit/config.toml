@@ -1,0 +1,15 @@
+[theme]
+# Warna utama (Tombol utama, slider, highlight) - Biru Modern
+primaryColor = "#2563EB"
+
+# Warna latar belakang aplikasi (Putih bersih)
+backgroundColor = "#FFFFFF"
+
+# Warna latar belakang sekunder (Sidebar, kotak input) - Abu-abu kebiruan sangat muda
+secondaryBackgroundColor = "#F8FAFC"
+
+# Warna teks utama - Abu-abu gelap elegan (tidak hitam pekat agar nyaman di mata)
+textColor = "#1E293B"
+
+# Font dasar bawaan Streamlit
+font = "sans serif"

@@ -115,7 +115,7 @@ def check_password():
     left_co, cent_co, last_co = st.columns([1, 2, 1])
     
     with cent_co:
-        st.subheader("Login")
+        st.space()
         with st.form("Credentials"):
             st.text_input("Username", key="username")
             st.text_input("Password", type="password", key="password")
@@ -136,6 +136,35 @@ st.set_page_config(
     page_icon="🔬",
     layout="wide"
 )
+
+st.markdown("""
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+        /* Terapkan font Inter hanya ke elemen teks murni agar icon aman */
+        html, body, .stApp, p, li, label, h1, h2, h3, h4, h5, h6 {
+            font-family: 'Inter', sans-serif !important;
+        }
+
+        h1, h2, h3 {
+            font-weight: 600 !important;
+            letter-spacing: -0.02em !important;
+        }
+
+        /* Amankan tombol bawaan Streamlit agar teksnya Inter */
+        .stButton button p {
+            font-family: 'Inter', sans-serif !important;
+        }
+
+        /* PROTEKSI TOTAL UNTUK IKON SIDEBAR & DOWNLOAD */
+        .material-symbols-rounded, 
+        .material-icons, 
+        [data-testid="stIcon"],
+        span[class*="icon"] {
+            font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 if not check_password():
     st.stop()
@@ -176,6 +205,8 @@ with st.sidebar:
         import time
         time.sleep(2.5)
         st.rerun()
+
+    st.space()
 
     st.sidebar.markdown(f"""
     <div style="
@@ -264,7 +295,7 @@ if selection == "Peritonitis Prediction":
             choice = target_col.selectbox(label, options, index=0)
             user_selections[var['label']] = choice
 
-        st.caption("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh **signifikan** terhadap peritonitis (berdasarkan hasil meta-analisis).")
+        st.caption("ℹ️ Variabel dengan tanda bintang (*) berpengaruh **signifikan** terhadap peritonitis (berdasarkan hasil meta-analisis).")
         
         if st.button("Hitung Tingkat Risiko"):
             if not patient_name:
@@ -307,51 +338,64 @@ if selection == "Peritonitis Prediction":
 
             # === Hasil Prediksi ===
             if peritonitis_risk_rate >= 50:
-                color_code = "#f97316"
-                status_label = "🟠BERISIKO TINGGI PERITONITIS"
-                status_text = "≥ 50%"
+                color_code = "#E11D48"
+                status_label = "BERISIKO TINGGI PERITONITIS"
+                status_text = "≥50%"
                 outcome = "Berisiko Tinggi Peritonitis"
             else:
-                color_code = "#22c55e"
-                status_label = "🟢BERISIKO RENDAH PERITONITIS"
-                status_text = "< 50%"
+                color_code = "#0D9488"
+                status_label = "BERISIKO RENDAH PERITONITIS"
+                status_text = "<50%"
                 outcome = "Berisiko Rendah Peritonitis"
             
             st.markdown(f"""
                 <div style="line-height: 1.0;">
                     <h3 style="margin-bottom: 4px; padding-bottom: 0px;">Hasil Prediksi <i>{patient_name}</i></h3>
-                    <h1 style="color: {color_code}; margin-top: 0px; margin-bottom: 4px; padding: 0px; font-weight: bold;">{peritonitis_risk_rate:.2f}%</h1>
+                    <h1 style="color: {color_code}; margin-top: 0px; margin-bottom: 4px; padding: 0px; font-weight: 900 !important; letter-spacing: -0.04em;">
+                        <strong>{peritonitis_risk_rate:.2f}%</strong>
+                    </h1>
                     <p style="margin-top: 0px; font-size: 0.85rem; color: gray; font-style: italic;">
                         Pasien termasuk kategori <b>{status_label}</b> karena tingkat risiko {status_text}
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
 
+            st.space()
+
             expl_col1, expl_col2 = st.columns(2)
 
             with expl_col1:
-                with ui.card(key="card_protective"):
-                    ui.element("span", children=["Faktor Protektif Peritonitis"], className="text-black text-sm font-bold m-1", key="label_prot")
-                    ui.element("p", children=["Variabel yang menjauhkan pasien dari risiko peritonitis (RR < 1)"], className="text-gray-400 text-xs m-1", key="desc_prot")
-                    
-                    if xai_supporting_non_peritonitis:
-                        for idx, item in enumerate(xai_supporting_non_peritonitis):
-                            ui.element("p", children=[f"• {item}"], className="text-sm text-gray-700 m-1", key=f"list_prot{idx}")
-                    else:
-                        ui.element("p", children=["Tidak ada protective factors spesifik."], className="text-sm text-gray-400 m-1", key="none_prot")
+                html_protektif = """<div style="background-color: #ffffff; padding: 24px; border-radius: 12px; border: 1px solid #E2E8F0; border-top: 5px solid #10B981; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.02); font-family: 'Inter', sans-serif;"><span style="color: #0F172A; font-size: 0.95rem; font-weight: 700; display: block; margin-bottom: 4px;">🛡️ Faktor Protektif Peritonitis</span><p style="color: #64748B; font-size: 0.75rem; margin-bottom: 8px; line-height: 1.4;">Variabel yang menurunkan risiko terjadinya infeksi peritonitis (RR &lt; 1)</p>"""
+                
+                if xai_supporting_non_peritonitis:
+                    html_protektif += """<ul style="color: #334155; font-size: 0.875rem; padding-left: 16px; margin: 0; line-height: 1.8; list-style-type: disc;">"""
+                    for item in xai_supporting_non_peritonitis:
+                        html_protektif += f"<li style='margin-bottom: 6px;'>{item}</li>"
+                    html_protektif += "</ul>"
+                else:
+                    # Menggunakan tag <p> dengan margin: 0 agar lurus simetris di sebelah kiri
+                    html_protektif += "<p style='color: #94A3B8; font-size: 0.875rem; margin: 0; padding-left: 0;'>Tidak ada protective factors spesifik.</p>"
+                
+                html_protektif += "</div>"
+                st.markdown(html_protektif, unsafe_allow_html=True)
 
             with expl_col2:
-                with ui.card(key="card_risk"):
-                    ui.element("span", children=["Faktor Pemicu Peritonitis"], className="text-black text-sm font-bold m-1", key="label_risk")
-                    ui.element("p", children=["Variabel yang memperberat risiko peritonitis (RR > 1)"], className="text-gray-400 text-xs m-1", key="desc_risk")
-                    
-                    if xai_supporting_peritonitis:
-                        for idx, item in enumerate(xai_supporting_peritonitis):
-                            ui.element("p", children=[f"• {item}"], className="text-sm text-gray-700 m-1", key=f"list_risk{idx}")
-                    else:
-                        ui.element("p", children=["Risiko terpantau rendah."], className="text-sm text-gray-400 m-1", key="none_risk")
+                html_pemicu = """<div style="background-color: #ffffff; padding: 24px; border-radius: 12px; border: 1px solid #E2E8F0; border-top: 5px solid #EF4444; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.02); font-family: 'Inter', sans-serif;"><span style="color: #0F172A; font-size: 0.95rem; font-weight: 700; display: block; margin-bottom: 4px;">⚠️ Faktor Pemicu Peritonitis</span><p style="color: #64748B; font-size: 0.75rem; margin-bottom: 8px; line-height: 1.4;">Variabel yang memicu risiko peritonitis (RR &gt; 1)</p>"""
+                
+                if xai_supporting_peritonitis:
+                    html_pemicu += """<ul style="color: #334155; font-size: 0.875rem; padding-left: 16px; margin: 0; line-height: 1.8; list-style-type: disc;">"""
+                    for item in xai_supporting_peritonitis:
+                        html_pemicu += f"<li style='margin-bottom: 6px;'>{item}</li>"
+                    html_pemicu += "</ul>"
+                else:
+                    # Menggunakan tag <p> dengan margin: 0 agar lurus simetris di sebelah kiri
+                    html_pemicu += "<p style='color: #94A3B8; font-size: 0.875rem; margin: 0; padding-left: 0;'>Risiko terpantau rendah.</p>"
+                
+                html_pemicu += "</div>"
+                st.markdown(html_pemicu, unsafe_allow_html=True)
     
-            st.caption("ℹ️ Variabel dengan tanda bintang (*) memiliki pengaruh **signifikan** terhadap peritonitis (berdasarkan hasil meta-analisis).")
+            st.space()
+            st.caption("ℹ️ Variabel dengan tanda bintang (*) berpengaruh **signifikan** terhadap peritonitis (berdasarkan hasil meta-analisis).")
 
             st.space()
 
