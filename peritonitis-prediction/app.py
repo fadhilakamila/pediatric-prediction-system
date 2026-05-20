@@ -260,7 +260,7 @@ if selection == "Peritonitis Prediction":
             is_significant = "*" if var['label'] in significant_vars else ""
             label = f"{i+1}. {var['label']}{is_significant}"
 
-            options = [var['non-peritonitis'], var['peritonitis']]
+            options = [var['peritonitis'], var['non-peritonitis']]
             choice = target_col.selectbox(label, options, index=0)
             user_selections[var['label']] = choice
 
