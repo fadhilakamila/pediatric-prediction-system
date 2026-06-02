@@ -3,11 +3,11 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from datetime import datetime
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import confusion_matrix
 
-# =====================================================================
-# STEP 1: DEFINISI LOGIKA HITUNG SKOR (EKSTRAKSI DARI app.py PERITONITIS)
-# =====================================================================
+# ====================
+# STEP 1: DEFINE
+# ====================
 variables_data = [
     {"label": "Age", "non-peritonitis": ">2 yo", "peritonitis": "<2 yo", "p_val": 0.002, "rr": 1.4, "mrf": False},
     {"label": "Gender", "non-peritonitis": "Female", "peritonitis": "Male", "p_val": 0.09, "rr": 1.08, "mrf": False},
@@ -29,84 +29,86 @@ variables_data = [
     {"label": "Stunting", "non-peritonitis": "No stunting", "peritonitis": "Stunting", "p_val": 0.32, "rr": 0.72, "mrf": True},
 ]
 
-def hitung_prediksi_web(row_pasien):
-    """Fungsi imitasi untuk menghitung hasil kalkulator web secara otomatis"""
-    total_wi_xi = 0
-    total_wi = 0
+def hitung_prediksi_baseline(row_pasien):
+    wa_base_wi_xi = 0
+    wa_base_wi = 0
 
     for var in variables_data:
-        weight = 2 if var['p_val'] < 0.05 else 1
-        nilai_pasien = row_pasien[var['label']]
-        x_val = 1 if nilai_pasien == var['peritonitis'] else 0
+        wi = 2 if var["p_val"] < 0.05 else 1
         
-        total_wi_xi += (weight * x_val)
-        total_wi += weight
-
-    peritonitis_risk_rate = (total_wi_xi / total_wi) * 100
+        nilai_pasien = str(row_pasien[var['label']]).strip()
+        
+        if nilai_pasien.lower() == "tidak diketahui":
+            pilihan_efektif = var['peritonitis']
+        else:
+            pilihan_efektif = nilai_pasien
+            
+        xi = 1 if pilihan_efektif.lower() == var["peritonitis"].lower() else 0
     
-    # OUTPUT SUDAH MENGGUNAKAN TEKS LENGKAP UNTUK EXCEL
-    if peritonitis_risk_rate >= 50:
+        wa_base_wi_xi += (wi * xi)
+        wa_base_wi += wi
+
+    score_wa_base = (wa_base_wi_xi / wa_base_wi) * 100
+    
+    if score_wa_base >= 50:
         kategori = "Berisiko Tinggi Peritonitis"
     else:
         kategori = "Berisiko Rendah Peritonitis"
-    return kategori, peritonitis_risk_rate
+        
+    return kategori, score_wa_base
 
 # =====================================================================
-# STEP 2: OTOMATISASI PENGISIAN & EVALUASI DATA EXCEL
+# STEP 2: OTOMATISASI EVALUASI BERKAS DATA_PASIEN_BERSIH_1.XLSX
 # =====================================================================
-file_name = "data_pasien_bersih.xlsx" 
+file_name = "data_pasien_bersih_1.xlsx" 
 df = pd.read_excel(file_name)
 
 hasil_kategori_list = []
 hasil_persentase_list = []
 for index, row in df.iterrows():
-    prediksi_kategori, prediksi_persentase = hitung_prediksi_web(row)
+    prediksi_kategori, prediksi_persentase = hitung_prediksi_baseline(row)
     hasil_kategori_list.append(prediksi_kategori)
     hasil_persentase_list.append(f"{prediksi_persentase:.2f}%")
 
-# Masukkan hasil teks lengkap langsung ke dalam tabel Excel kerja kamu
 df["Hasil Prediksi (Kategori)"] = hasil_kategori_list
 df["Hasil Prediksi (Risk Rate %)"] = hasil_persentase_list
 
-# Ambil nilai langsung dari kolom asli tanpa perlu melakukan transform teks lagi
-y_true = df["Outcome Data Riil"]
-y_pred = df["Hasil Prediksi (Kategori)"]
+y_true = df["Outcome Data Riil"].str.strip()
+y_pred = df["Hasil Prediksi (Kategori)"].str.strip()
 
-# =====================================================================
-# STEP 3: HITUNG & TAMPILKAN CONFUSION MATRIX
-# =====================================================================
-# Evaluasi matriks menggunakan nama label teks lengkap agar sesuai dengan isi data
+# ====================================================
+# STEP 3: CONFUSION MATRIX 
+# ====================================================
 labels = ["Berisiko Tinggi Peritonitis", "Berisiko Rendah Peritonitis"]
 cm = confusion_matrix(y_true, y_pred, labels=labels)
 tp, fn, fp, tn = cm.ravel()
 
-print("\n======================================")
-print("EVALUASI PERFORMA KALKULATOR PERITONITIS")
-print("======================================")
+print("\n======================================================")
+print("EVALUASI MODEL WEIGHTED AVERAGE - BASELINE")
+print("======================================================")
 print(f" True Positive (TP)  : {tp} pasien")
-print(f" False Positive (FP) : {fp} pasien")
 print(f" False Negative (FN) : {fn} pasien")
+print(f" False Positive (FP) : {fp} pasien")
 print(f" True Negative (TN)  : {tn} pasien")
-print("--------------------------------------")
+print("------------------------------------------------------")
 
-accuracy = (tp + tn) / (tp + tn + fp + fn)
-sensitivity = tp / (tp + fn)
-spesificity = tn / (tn + fp)
-precision = tp / (tp + fp)
+accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0
+sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
+specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
+precision = tp / (tp + fp) if (tp + fp) > 0 else 0
 
 print(f" Accuracy           : {accuracy:.2%}")
 print(f" Sensitivity/Recall : {sensitivity:.2%}")
-print(f" Specificity        : {spesificity:.2%}")
+print(f" Specificity        : {specificity:.2%}")
 print(f" Precision          : {precision:.2%}")
-print("======================================\n")
+print("======================================================\n")
 
-# Simpan tabel kembali ke Excel (Data tersimpan rapi dalam format teks lengkap)
 df.to_excel(file_name, index=False)
-print(f"🔥 Sukses! Hasil Prediksi (Kategori) telah terisi otomatis di file '{file_name}'.")
+print(f"🔥 Sukses! Hasil sinkronisasi matriks otomatis disimpan ke '{file_name}'.")
 
-# =====================================================================
-# STEP 4: MEMBUAT GRAFIK HEATMAP
-# =====================================================================
+# ================================
+# STEP 4: GRAFIK HEATMAP 
+# ================================
 plt.figure(figsize=(6, 5))
 sns.heatmap(
     cm, 
@@ -116,12 +118,12 @@ sns.heatmap(
     xticklabels=["Tinggi", "Rendah"], 
     yticklabels=["Tinggi", "Rendah"] 
 )
-plt.title("Confusion Matrix - Prediksi Risiko Peritonitis", fontsize=12, pad=15)
-plt.ylabel("Hasil Prediksi Aplikasi", fontsize=10)
-plt.xlabel("Kondisi Riil", fontsize=10)
+plt.title("Confusion Matrix - Prediksi Risiko Peritonitis (Baseline)", fontsize=12, pad=15)
+plt.ylabel("Actual", fontsize=10)
+plt.xlabel("Predicted", fontsize=10)
 
 waktu_sekarang = datetime.now().strftime("%Y%m%d_%H%M%S")
-nama_file_gambar = f"confusion_matrix_{waktu_sekarang}.png"
+nama_file_gambar = f"confusion_matrix_baseline_{waktu_sekarang}.png"
 plt.savefig(nama_file_gambar, dpi=300, bbox_inches="tight")
-print(f"Grafik matriks berhasil disimpan dengan nama '{nama_file_gambar}'.")
+print(f"Grafik matriks baseline berhasil disimpan dengan nama '{nama_file_gambar}'.")
 plt.show()
