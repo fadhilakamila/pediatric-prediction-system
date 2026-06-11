@@ -10,7 +10,7 @@ from sklearn.metrics import confusion_matrix
 # ====================
 variables_data = [
     {"label": "Age", "non-peritonitis": ">2 yo", "peritonitis": "<2 yo", "p_val": 0.002, "rr": 1.4, "weight": 2, "mrf": False},
-    {"label": "Gender", "non-peritonitis": "Female", "peritonitis": "Male", "p_val": 0.09, "rr": 1.08, "weight": 0, "mrf": False},
+    {"label": "Gender", "non-peritonitis": "Female", "peritonitis": "Male", "p_val": 0.09, "rr": 1.08, "weight": 1, "mrf": False},
     {"label": "Duration of PD", "non-peritonitis": "<12 mo", "peritonitis": ">12 mo", "p_val": 0.001, "rr": 2.29, "weight": 2, "mrf": False},
     {"label": "Place of Residence", "non-peritonitis": "Rural", "peritonitis": "Urban", "p_val": 0.08, "rr": 1.22, "weight": 0, "mrf": False},
     {"label": "Housing", "non-peritonitis": "Good service", "peritonitis": "Fair/poor service", "p_val": 0.77, "rr": 0.92, "weight": 1, "mrf": True},
@@ -120,7 +120,7 @@ sns.heatmap(
     yticklabels=["Tinggi", "Rendah"] 
 )
 plt.title("Confusion Matrix - Prediksi Risiko Peritonitis (Optimized)", fontsize=12, pad=15)
-plt.ylabel("Actual)", fontsize=10)
+plt.ylabel("Actual", fontsize=10)
 plt.xlabel("Predicted", fontsize=10)
 
 waktu_sekarang = datetime.now().strftime("%Y%m%d_%H%M%S")
