@@ -89,6 +89,15 @@ st.markdown("""
             background-color: #FFFFFF !important;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
             padding: 32px !important;
+            
+            /* RESPONSIF TENGAH LAYAR */
+            max-width: 420px !important; 
+            width: 100% !important;     
+            min-width: 400px !important;
+            
+            position: relative !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
         }
 
         /* 5. MENU SIDEBAR NAVIGATION */
