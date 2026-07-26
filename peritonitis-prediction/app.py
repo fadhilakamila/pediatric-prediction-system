@@ -576,7 +576,7 @@ if selection == "Peritonitis Prediction":
                 # XAI
                 # ==============================================================================
                 st.markdown(" ")
-                st.markdown("#### 💡 Explainable AI")
+                st.markdown("#### 💡 eXplainable AI")
                 expl_col1, expl_col2 = st.columns(2)
 
                 with expl_col1:
